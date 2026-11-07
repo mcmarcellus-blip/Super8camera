@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super 8 Vintage Camera Simulator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Special+Elite&display=swap');
+
+        body {
+            font-family: 'Courier Prime', monospace;
+            background-color: #1a1816;
+            color: #d1c7b7;
+        }
+
+        .vintage-title {
+            font-family: 'Special Elite', cursive;
+        }
+
+        /* Leather texture background for camera body */
+        .camera-leather {
+            background-color: #24211e;
+            background-image: radial-gradient(#151311 15%, transparent 16%), radial-gradient(#151311 15%, transparent 16%);
+            background-size: 8px 8px;
+            background-position: 0 0, 4px 4px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        .brushed-metal {
+            background: linear-gradient(135deg, #8a8885 0%, #d8d5cf 45%, #9e9b94 55%, #4a4845 100%);
+        }
+
+        .vintage-btn {
+            background: linear-gradient(180deg, #57534e 0%, #292524 100%);
+            border: 2px solid #78716c;
+            box-shadow: 0 4px 0 #1c1917, 0 5px 10px rgba(0,0,0,0.5);
+            transition: all 0.05s ease;
+        }
+
+        .vintage-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #1c1917, 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .rec-btn {
+            background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
+            border: 2px solid #ef4444;
+            box-shadow: 0 4px 0 #7f1d1d, 0 5px 10px rgba(0,0,0,0.6);
+        }
+
+        .rec-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #7f1d1d, 0 2px 5px rgba(0,0,0,0.6);
+        }
+
+        .rec-btn.recording {
+            animation: pulse-red 1s infinite alternate;
+        }
+
+        @keyframes pulse-red {
+            from { box-shadow: 0 0 5px #ef4444, inset 0 0 10px #f87171; }
+            to { box-shadow: 0 0 20px #ef4444, inset 0 0 20px #f87171; }
+        }
+
+        /* Custom Range Input */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: #1c1917;
+            height: 6px;
+            border-radius: 3px;
+            border: 1px solid #44403c;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #d6d3d1;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            border: 1px solid #78716c;
+        }
+
+        /* LCD Screen style */
+        .lcd-screen {
+            background-color: #1c2b1a;
+            color: #55ff55;
+            text-shadow: 0 0 3px #55ff55;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-2 sm:p-6 select-none">
+
+    <!-- MAIN CONTAINER - CAMERA BODY -->
+    <div class="w-full max-w-5xl camera-leather rounded-3xl p-4 sm:p-8 border-4 border-stone-800 shadow-2xl relative overflow-hidden">
+        
+        <!-- Metal Plate Header -->
+        <div class="brushed-metal p-3 sm:p-4 rounded-xl mb-6 text-stone-900 flex justify-between items-center border border-stone-400 shadow-md">
+            <div class="flex items-center gap-3">
+                <div class="w-4 h-4 rounded-full bg-red-600 border border-stone-800 shadow-inner"></div>
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-wider vintage-title">CINE-KODAK SUPER 8</h1>
+            </div>
+            <div class="text-xs sm:text-sm font-bold tracking-widest bg-stone-900 text-amber-500 px-3 py-1 rounded border border-stone-700">
+                18 FPS AUTOMATIC
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT WORKSPACE -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- LEFT / CENTER: VIEWFINDER & CANVAS -->
+            <div class="lg:col-span-8 flex flex-col items-center justify-center">
+                <!-- Viewfinder Housing -->
+                <div class="relative w-full aspect-[4/3] bg-black rounded-2xl overflow-hidden border-8 border-stone-900 shadow-2xl flex items-center justify-center">
+                    
+                    <!-- Main Processing Canvas -->
+                    <canvas id="viewfinder" class="w-full h-full object-contain"></canvas>
+
+                    <!-- Overlay UI Elements on Viewfinder -->
+                    <div id="recIndicator" class="hidden absolute top-4 left-4 flex items-center gap-2 bg-black/60 px-3 py-1 rounded-full border border-red-500/50">
+                        <div class="w-3 h-3 rounded-full bg-red-600 animate-ping"></div>
+                        <span class="text-red-500 text-xs font-bold tracking-widest">REC</span>
+                        <span id="recTime" class="text-white text-xs font-mono ml-1">00:00</span>
+                    </div>
+
+                    <div id="noSignalMsg" class="absolute inset-0 flex flex-col items-center justify-center bg-stone-950 text-stone-500 gap-3">
+                        <i data-lucide="camera-off" class="w-16 h-16 opacity-40"></i>
+                        <p class="text-sm font-semibold tracking-wide">AVVIA FOTOCAMERA O CARICA UN VIDEO</p>
+                    </div>
+                </div>
+
+                <!-- Primary Action Bar (Under Viewfinder) -->
+                <div class="w-full flex flex-wrap items-center justify-between gap-3 mt-4 bg-stone-900/80 p-3 rounded-xl border border-stone-800">
+                    <div class="flex gap-2">
+                        <button id="btnCamera" class="vintage-btn text-white px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2">
+                            <i data-lucide="camera" class="w-4 h-4"></i>
+                            FOTOCAMERA
+                        </button>
+                        <button id="btnUpload" class="vintage-btn text-white px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2">
+                            <i data-lucide="upload" class="w-4 h-4"></i>
+                            CARICA FILE
+                        </button>
+                        <input type="file" id="fileInput" accept="video/*" class="hidden">
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button id="btnRecord" class="rec-btn text-white px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2 disabled:opacity-50" disabled>
+                            <i data-lucide="disc" class="w-4 h-4"></i>
+                            REGISTRA
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: CONTROLS & VINTAGE ADJUSTMENTS -->
+            <div class="lg:col-span-4 flex flex-col gap-4">
+                
+                <!-- Vintage Control Panel Box -->
+                <div class="bg-stone-900/90 p-4 rounded-xl border border-stone-800 flex flex-col gap-4">
+                    <h2 class="text-sm font-bold tracking-widest text-amber-500 uppercase border-b border-stone-800 pb-2 flex items-center gap-2">
+                        <i data-lucide="sliders" class="w-4 h-4"></i> PROPRIETÀ PELLICOLA
+                    </h2>
+
+                    <!-- Preset Selector -->
+                    <div>
+                        <label class="text-xs text-stone-400 block mb-1">TIPO PELLICOLA (PRESET)</label>
+                        <select id="colorPreset" class="w-full bg-stone-950 text-stone-200 text-xs border border-stone-700 rounded-lg p-2 focus:outline-none focus:border-amber-500">
+                            <option value="kodachrome">Kodachrome 40 (Caldo / Anni '70)</option>
+                            <option value="tri-x">Kodak Tri-X (B&N Alto Contrasto)</option>
+                            <option value="faded">Faded 1968 (Colori Sbiaditi)</option>
+                            <option value="technicolor">Vivid Super 8 (Saturazione Densa)</option>
+                        </select>
+                    </div>
+
+                    <!-- Frame Rate Switch -->
+                    <div>
+                        <label class="text-xs text-stone-400 block mb-1">FREQUENZA QUADRI (FPS)</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button data-fps="18" class="fps-btn vintage-btn text-xs py-1.5 rounded text-amber-400 font-bold border-amber-500">18 FPS</button>
+                            <button data-fps="24" class="fps-btn vintage-btn text-xs py-1.5 rounded text-stone-300">24 FPS</button>
+                            <button data-fps="12" class="fps-btn vintage-btn text-xs py-1.5 rounded text-stone-300">12 FPS</button>
+                        </div>
+                    </div>
+
+                    <!-- Sliders -->
+                    <div class="space-y-3 pt-2 border-t border-stone-800/80">
+                        <div>
+                            <div class="flex justify-between text-xs text-stone-400 mb-1">
+                                <span>Granulosità Pellicola</span>
+                                <span id="valGrain">40%</span>
+                            </div>
+                            <input type="range" id="sliderGrain" min="0" max="100" value="40" class="w-full">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs text-stone-400 mb-1">
+                                <span>Spolverio e Graffi</span>
+                                <span id="valDust">50%</span>
+                            </div>
+                            <input type="range" id="sliderDust" min="0" max="100" value="50" class="w-full">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs text-stone-400 mb-1">
+                                <span>Frequenza Infiltrazioni Luce</span>
+                                <span id="valLeaks">30%</span>
+                            </div>
+                            <input type="range" id="sliderLeaks" min="0" max="100" value="30" class="w-full">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs text-stone-400 mb-1">
+                                <span>Instabilità Verticale (Jitter)</span>
+                                <span id="valJitter">35%</span>
+                            </div>
+                            <input type="range" id="sliderJitter" min="0" max="100" value="35" class="w-full">
+                        </div>
+                    </div>
+
+                    <!-- Audio Effects Toggle -->
+                    <div class="pt-2 border-t border-stone-800 flex items-center justify-between">
+                        <span class="text-xs text-stone-400 flex items-center gap-2">
+                            <i data-lucide="volume-2" class="w-4 h-4 text-stone-400"></i> Rumore Proiettore Audio
+                        </span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="toggleAudio" class="sr-only peer" checked>
+                            <div class="w-9 h-5 bg-stone-950 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-300 after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Status / Info Box -->
+                <div class="lcd-screen p-3 rounded-xl border border-stone-800 text-xs flex justify-between items-center">
+                    <div>
+                        <div class="opacity-70">STATO PROPRIETÀ</div>
+                        <div id="statusText" class="font-bold">PRONTO</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="opacity-70">RISOLUZIONE</div>
+                        <div class="font-bold">720 x 540 (4:3)</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Video Element for Video Input Processing -->
+    <video id="hiddenVideo" class="hidden" playsinline loop muted></video>
+
+    <!-- JAVASCRIPT SIMULATOR LOGIC -->
+    <script>
+        // Icons Initialization
+        lucide.createIcons();
+
+        // Canvas & Context Setup
+        const canvas = document.getElementById('viewfinder');
+        const ctx = canvas.getContext('2d');
+        const hiddenVideo = document.getElementById('hiddenVideo');
+        
+        // UI Controls
+        const btnCamera = document.getElementById('btnCamera');
+        const btnUpload = document.getElementById('btnUpload');
+        const fileInput = document.getElementById('fileInput');
+        const btnRecord = document.getElementById('btnRecord');
+        const recIndicator = document.getElementById('recIndicator');
+        const recTimeEl = document.getElementById('recTime');
+        const noSignalMsg = document.getElementById('noSignalMsg');
+        const statusText = document.getElementById('statusText');
+
+        // Vintage Parameter Inputs
+        const colorPreset = document.getElementById('colorPreset');
+        const sliderGrain = document.getElementById('sliderGrain');
+        const sliderDust = document.getElementById('sliderDust');
+        const sliderLeaks = document.getElementById('sliderLeaks');
+        const sliderJitter = document.getElementById('sliderJitter');
+        const toggleAudio = document.getElementById('toggleAudio');
+        const fpsBtns = document.querySelectorAll('.fps-btn');
+
+        // Canvas Resolution Setup (Native Super 8 Standard Aspect Ratio 4:3)
+        canvas.width = 720;
+        canvas.height = 540;
+
+        // Simulator State
+        let streamSource = null;
+        let isPlaying = false;
+        let targetFps = 18;
+        let lastFrameTime = 0;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+        let recStartTime = 0;
+        let recTimerInterval = null;
+
+        // Audio Effects Generator (Web Audio API for Vinyl/Projector Noise)
+        let audioCtx = null;
+        let noiseNode = null;
+        let gainNode = null;
+
+        function initAudio() {
+            if (audioCtx) return;
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Create Noise Buffer
+                const bufferSize = audioCtx.sampleRate * 2;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const output = buffer.getChannelData(0);
+                
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+
+                noiseNode = audioCtx.createBufferSource();
+                noiseNode.buffer = buffer;
+                noiseNode.loop = true;
+
+                // Filter to make it sound like projector hum & crackle
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 400;
+                filter.Q.value = 3;
+
+                gainNode = audioCtx.createGain();
+                gainNode.gain.value = toggleAudio.checked ? 0.04 : 0;
+
+                noiseNode.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                noiseNode.start();
+            } catch (e) {
+                console.warn('Audio Context non supportato:', e);
+            }
+        }
+
+        toggleAudio.addEventListener('change', () => {
+            if (gainNode && audioCtx) {
+                gainNode.gain.value = toggleAudio.checked ? 0.04 : 0;
+            }
+        });
+
+        // Event Listeners for Controls
+        sliderGrain.addEventListener('input', (e) => document.getElementById('valGrain').innerText = e.target.value + '%');
+        sliderDust.addEventListener('input', (e) => document.getElementById('valDust').innerText = e.target.value + '%');
+        sliderLeaks.addEventListener('input', (e) => document.getElementById('valLeaks').innerText = e.target.value + '%');
+        sliderJitter.addEventListener('input', (e) => document.getElementById('valJitter').innerText = e.target.value + '%');
+
+        fpsBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                fpsBtns.forEach(b => {
+                    b.classList.remove('text-amber-400', 'border-amber-500');
+                    b.classList.add('text-stone-300');
+                });
+                btn.classList.add('text-amber-400', 'border-amber-500');
+                targetFps = parseInt(btn.dataset.fps);
+            });
+        });
+
+        // Initialize Live Camera
+        btnCamera.addEventListener('click', async () => {
+            try {
+                if (streamSource) {
+                    streamSource.getTracks().forEach(t => t.stop());
+                }
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: true });
+                hiddenVideo.srcObject = stream;
+                hiddenVideo.play();
+                streamSource = stream;
+                isPlaying = true;
+                noSignalMsg.classList.add('hidden');
+                btnRecord.disabled = false;
+                statusText.innerText = "FOTOCAMERA ATTIVA";
+                initAudio();
+            } catch (err) {
+                alert("Errore nell'accesso alla fotocamera: " + err.message);
+            }
+        });
+
+        // Upload Video File
+        btnUpload.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                if (streamSource) {
+                    streamSource.getTracks().forEach(t => t.stop());
+                }
+                const url = URL.createObjectURL(file);
+                hiddenVideo.srcObject = null;
+                hiddenVideo.src = url;
+                hiddenVideo.play();
+                isPlaying = true;
+                noSignalMsg.classList.add('hidden');
+                btnRecord.disabled = false;
+                statusText.innerText = "RIPRODUZIONE FILE";
+                initAudio();
+            }
+        });
+
+        // --- RENDER & SUPER 8 EFFECT PIPELINE ---
+        function renderFrame(timestamp) {
+            requestAnimationFrame(renderFrame);
+
+            if (!isPlaying || hiddenVideo.paused || hiddenVideo.ended) return;
+
+            // Frame Rate Throttle Simulation
+            const interval = 1000 / targetFps;
+            const delta = timestamp - lastFrameTime;
+            if (delta < interval) return;
+            lastFrameTime = timestamp - (delta % interval);
+
+            // 1. Vertical Motion Jitter
+            const jitterVal = parseFloat(sliderJitter.value) / 100;
+            const offsetY = (Math.random() - 0.5) * 12 * jitterVal;
+            const offsetX = (Math.random() - 0.5) * 4 * jitterVal;
+
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Calculate center-crop coordinates (object-fit: cover)
+            const vWidth = hiddenVideo.videoWidth || canvas.width;
+            const vHeight = hiddenVideo.videoHeight || canvas.height;
+            const targetAspect = canvas.width / canvas.height;
+            const sourceAspect = vWidth / vHeight;
+
+            let sx = 0, sy = 0, sw = vWidth, sh = vHeight;
+
+            if (sourceAspect > targetAspect) {
+                // Video is wider than 4:3 (e.g. 16:9) -> crop left & right
+                sw = vHeight * targetAspect;
+                sx = (vWidth - sw) / 2;
+            } else if (sourceAspect < targetAspect) {
+                // Video is taller than 4:3 (e.g. 9:16 vertical) -> crop top & bottom
+                sh = vWidth / targetAspect;
+                sy = (vHeight - sh) / 2;
+            }
+
+            // 2. Draw Base Video Image (Shifted for Jitter with Center Crop)
+            ctx.drawImage(hiddenVideo, sx, sy, sw, sh, offsetX, offsetY, canvas.width, canvas.height);
+
+            // 3. Color Grading & Vignette Filters
+            applyColorGrading(colorPreset.value);
+
+            // 4. Exposure Flicker Simulation
+            const flicker = 1 + (Math.random() - 0.5) * 0.12 * (jitterVal + 0.2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, (flicker - 1))})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 5. Film Grain Effect
+            const grainIntensity = parseFloat(sliderGrain.value) / 100;
+            if (grainIntensity > 0) {
+                drawFilmGrain(grainIntensity);
+            }
+
+            // 6. Dust & Scratch Artifacts
+            const dustIntensity = parseFloat(sliderDust.value) / 100;
+            if (dustIntensity > 0) {
+                drawDustAndScratches(dustIntensity);
+            }
+
+            // 7. Light Leaks
+            const leakIntensity = parseFloat(sliderLeaks.value) / 100;
+            if (leakIntensity > 0 && Math.random() < (0.15 * leakIntensity)) {
+                drawLightLeak(leakIntensity);
+            }
+
+            // 8. Super 8 Frame Overlay (Rounded Borders + Sprocket Holes)
+            drawSuper8FrameBorder();
+
+            ctx.restore();
+        }
+
+        // --- SUB-ROUTINES FOR SUPER 8 VISUALS ---
+
+        function applyColorGrading(preset) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'overlay';
+
+            if (preset === 'kodachrome') {
+                // Warm Sepia / Orange-Yellow Tinting
+                ctx.fillStyle = 'rgba(230, 140, 30, 0.35)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'rgba(120, 40, 0, 0.2)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else if (preset === 'tri-x') {
+                // High-Contrast Black & White
+                ctx.restore();
+                ctx.save();
+                ctx.globalCompositeOperation = 'saturation';
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else if (preset === 'faded') {
+                // Washout Green-Cyan Retro Tint
+                ctx.fillStyle = 'rgba(100, 180, 160, 0.25)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else if (preset === 'technicolor') {
+                // Strong Deep Saturation Boost
+                ctx.fillStyle = 'rgba(255, 0, 100, 0.15)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            ctx.restore();
+
+            // Vignette Shadow
+            const gradient = ctx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, canvas.width * 0.3,
+                canvas.width / 2, canvas.height / 2, canvas.width * 0.65
+            );
+            gradient.addColorStop(0, 'rgba(0,0,0,0)');
+            gradient.addColorStop(1, 'rgba(0,0,0,0.75)');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function drawFilmGrain(intensity) {
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imgData.data;
+            const factor = intensity * 45;
+
+            // Fast procedural grain sampling
+            for (let i = 0; i < data.length; i += 16) {
+                const noise = (Math.random() - 0.5) * factor;
+                data[i] = Math.min(255, Math.max(0, data[i] + noise));
+                data[i+1] = Math.min(255, Math.max(0, data[i+1] + noise));
+                data[i+2] = Math.min(255, Math.max(0, data[i+2] + noise));
+            }
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        function drawDustAndScratches(intensity) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.fillStyle = 'rgba(10, 10, 10, 0.7)';
+
+            // Vertical Hair / Scratch
+            if (Math.random() < 0.4 * intensity) {
+                ctx.beginPath();
+                const x = Math.random() * canvas.width;
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x + (Math.random() - 0.5) * 10, canvas.height);
+                ctx.lineWidth = Math.random() * 1.5;
+                ctx.stroke();
+            }
+
+            // Dust Particles
+            const count = Math.floor(Math.random() * 8 * intensity);
+            for (let i = 0; i < count; i++) {
+                ctx.beginPath();
+                const px = Math.random() * canvas.width;
+                const py = Math.random() * canvas.height;
+                const r = Math.random() * 2 * intensity;
+                ctx.arc(px, py, r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        function drawLightLeak(intensity) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            const leakGrad = ctx.createLinearGradient(0, 0, canvas.width * 0.5, canvas.height);
+            leakGrad.addColorStop(0, `rgba(255, 90, 0, ${0.4 * intensity})`);
+            leakGrad.addColorStop(0.5, `rgba(255, 0, 80, ${0.2 * intensity})`);
+            leakGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+            ctx.fillStyle = leakGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+        }
+
+        function drawSuper8FrameBorder() {
+            ctx.save();
+            ctx.fillStyle = '#0a0a0a';
+
+            // Outer Mask with rounded inner frame
+            const cornerRadius = 24;
+            const margin = 16;
+
+            ctx.beginPath();
+            // Outer rectangle
+            ctx.rect(0, 0, canvas.width, canvas.height);
+            
+            // Inner rounded cutout
+            ctx.roundRect(
+                margin, 
+                margin, 
+                canvas.width - (margin * 2), 
+                canvas.height - (margin * 2), 
+                cornerRadius
+            );
+            ctx.fill('evenodd');
+
+            ctx.restore();
+        }
+
+        // --- MEDIA RECORDER & CANVAS RECORDING ---
+        btnRecord.addEventListener('click', () => {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
+        function startRecording() {
+            recordedChunks = [];
+            const stream = canvas.captureStream(targetFps);
+
+            // Optional: Include audio crackle stream if active
+            if (audioCtx && toggleAudio.checked) {
+                const dest = audioCtx.createMediaStreamDestination();
+                gainNode.connect(dest);
+                const audioTrack = dest.stream.getAudioTracks()[0];
+                if (audioTrack) stream.addTrack(audioTrack);
+            }
+
+            const options = { mimeType: 'video/webm;codecs=vp9' };
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+            } catch (e) {
+                mediaRecorder = new MediaRecorder(stream);
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = downloadVideo;
+
+            mediaRecorder.start();
+            isRecording = true;
+
+            // UI updates for recording state
+            btnRecord.innerText = "FERMA REGISTRAZIONE";
+            btnRecord.classList.add('recording');
+            recIndicator.classList.remove('hidden');
+            statusText.innerText = "REGISTRAZIONE IN CORSO...";
+
+            recStartTime = Date.now();
+            recTimerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - recStartTime) / 1000);
+                const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+                const secs = String(elapsed % 60).padStart(2, '0');
+                recTimeEl.innerText = `${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function stopRecording() {
+            if (!mediaRecorder) return;
+            mediaRecorder.stop();
+            isRecording = false;
+
+            // Reset UI
+            btnRecord.innerHTML = `<i data-lucide="disc" class="w-4 h-4"></i> REGISTRA`;
+            btnRecord.classList.remove('recording');
+            recIndicator.classList.add('hidden');
+            clearInterval(recTimerInterval);
+            statusText.innerText = "REGISTRAZIONE SALVATA";
+            lucide.createIcons();
+        }
+
+        function downloadVideo() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `Super8_Film_${Date.now()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+        }
+
+        // Start animation loop
+        requestAnimationFrame(renderFrame);
+    </script>
+</body>
+</html>
